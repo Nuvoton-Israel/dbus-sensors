@@ -32,8 +32,9 @@ static constexpr bool DEBUG = false;
 
 namespace fs = std::filesystem;
 
-static constexpr std::array<const char*, 2> sensorTypes = {
+static constexpr std::array<const char*, 3> sensorTypes = {
     "xyz.openbmc_project.Configuration.AspeedFan",
+    "xyz.openbmc_project.Configuration.NuvotonFan",
     "xyz.openbmc_project.Configuration.I2CFan"};
 constexpr const char* redundancyConfiguration =
     "xyz.openbmc_project.Configuration.FanRedundancy";
@@ -42,6 +43,7 @@ static std::regex inputRegex(R"(fan(\d+)_input)");
 enum class FanTypes
 {
     aspeed,
+    nuvoton,
     i2c
 };
 
@@ -55,6 +57,10 @@ FanTypes getFanType(const fs::path& parentPath)
     if (boost::ends_with(canonical, "1e786000.pwm-tacho-controller"))
     {
         return FanTypes::aspeed;
+    }
+    else if (boost::ends_with(canonical, "f0103000.pwm-fan-controller"))
+    {
+        return FanTypes::nuvoton;
     }
     // todo: will we need to support other types?
     return FanTypes::i2c;
@@ -158,7 +164,7 @@ void createSensors(
             {
                 continue;
             }
-            if (fanType == FanTypes::aspeed)
+            if (fanType == FanTypes::aspeed || fanType == FanTypes::nuvoton)
             {
                 // there will be only 1 aspeed sensor object in sysfs, we found
                 // the fan
