@@ -51,6 +51,8 @@ TachSensor::TachSensor(const std::string& path, const std::string& objectType,
     sensorInterface = objectServer.add_interface(
         "/xyz/openbmc_project/sensors/fan_tach/" + name,
         "xyz.openbmc_project.Sensor.Value");
+    sensorInterface->register_property("Unit",
+        std::string("xyz.openbmc_project.Sensor.Value.Unit.RPMS"));
 
     if (thresholds::hasWarningInterface(thresholds))
     {

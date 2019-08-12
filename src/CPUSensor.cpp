@@ -49,6 +49,8 @@ CPUSensor::CPUSensor(const std::string& path, const std::string& objectType,
         sensorInterface = objectServer.add_interface(
             "/xyz/openbmc_project/sensors/temperature/" + name,
             "xyz.openbmc_project.Sensor.Value");
+        sensorInterface->register_property("Unit",
+            std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
         if (thresholds::hasWarningInterface(thresholds))
         {
             thresholdInterfaceWarning = objectServer.add_interface(

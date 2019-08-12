@@ -50,6 +50,8 @@ HwmonTempSensor::HwmonTempSensor(
         "/xyz/openbmc_project/sensors/temperature/" + name,
         "xyz.openbmc_project.Sensor.Value");
 
+    sensorInterface->register_property("Unit",
+        std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
     if (thresholds::hasWarningInterface(thresholds))
     {
         thresholdInterfaceWarning = objectServer.add_interface(

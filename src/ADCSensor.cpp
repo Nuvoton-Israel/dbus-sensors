@@ -57,6 +57,8 @@ ADCSensor::ADCSensor(const std::string& path,
     sensorInterface = objectServer.add_interface(
         "/xyz/openbmc_project/sensors/voltage/" + name,
         "xyz.openbmc_project.Sensor.Value");
+    sensorInterface->register_property("Unit",
+        std::string("xyz.openbmc_project.Sensor.Value.Unit.Volts"));
     if (thresholds::hasWarningInterface(thresholds))
     {
         thresholdInterfaceWarning = objectServer.add_interface(
