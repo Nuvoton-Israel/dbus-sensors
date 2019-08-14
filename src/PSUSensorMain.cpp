@@ -31,7 +31,7 @@ static constexpr std::array<const char*, 1> sensorTypes = {
     "xyz.openbmc_project.Configuration.pmbus"};
 
 static std::vector<std::string> pmbusNames = {"pmbus", "pxe1610", "ina219",
-                                              "ina230"};
+                                              "ina230", "dps800", "tps53679", "tps53659", "tps53622"};
 namespace fs = std::filesystem;
 
 static boost::container::flat_map<std::string, std::unique_ptr<PSUSensor>>
