@@ -21,11 +21,12 @@ class CPUSensor : public Sensor
               const std::string& configuration, int cpuId, bool show,
               double dtsOffset);
     ~CPUSensor();
-    static constexpr unsigned int sensorScaleFactor = 1000;
+    static constexpr unsigned int sensorScaleFactor = 1;
     static constexpr unsigned int sensorPollMs = 1000;
     static constexpr size_t warnAfterErrorCount = 10;
     static constexpr double maxReading = 127;
     static constexpr double minReading = -128;
+    static constexpr double Scale = -3;
     static constexpr const char* labelTcontrol = "Tcontrol";
 
   private:

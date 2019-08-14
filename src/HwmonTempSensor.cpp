@@ -27,11 +27,12 @@
 #include <string>
 
 static constexpr unsigned int sensorPollMs = 500;
-static constexpr unsigned int sensorScaleFactor = 1000;
+static constexpr unsigned int sensorScaleFactor = 1;
 static constexpr size_t warnAfterErrorCount = 10;
 
 static constexpr double maxReading = 127;
 static constexpr double minReading = -128;
+static constexpr double Scale = -3;
 
 HwmonTempSensor::HwmonTempSensor(
     const std::string& path, const std::string& objectType,
@@ -52,6 +53,7 @@ HwmonTempSensor::HwmonTempSensor(
 
     sensorInterface->register_property("Unit",
         std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
+    sensorInterface->register_property("Scale", Scale);
     if (thresholds::hasWarningInterface(thresholds))
     {
         thresholdInterfaceWarning = objectServer.add_interface(

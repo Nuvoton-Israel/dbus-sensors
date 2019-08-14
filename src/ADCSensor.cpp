@@ -32,11 +32,12 @@ static constexpr unsigned int sensorPollMs = 500;
 static constexpr size_t warnAfterErrorCount = 10;
 static constexpr unsigned int gpioBridgeEnableMs = 20;
 // scaling factor from hwmon
-static constexpr unsigned int sensorScaleFactor = 1000;
+static constexpr unsigned int sensorScaleFactor = 1;
 
-static constexpr double roundFactor = 10000; // 3 decimal places
+static constexpr double roundFactor = 1;
 static constexpr double maxReading = 20;
 static constexpr double minReading = 0;
+static constexpr double Scale = -3;
 
 ADCSensor::ADCSensor(const std::string& path,
                      sdbusplus::asio::object_server& objectServer,
@@ -59,6 +60,7 @@ ADCSensor::ADCSensor(const std::string& path,
         "xyz.openbmc_project.Sensor.Value");
     sensorInterface->register_property("Unit",
         std::string("xyz.openbmc_project.Sensor.Value.Unit.Volts"));
+    sensorInterface->register_property("Scale", Scale);
     if (thresholds::hasWarningInterface(thresholds))
     {
         thresholdInterfaceWarning = objectServer.add_interface(

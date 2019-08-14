@@ -48,28 +48,32 @@ PSUSensor::PSUSensor(const std::string& path, const std::string& objectType,
     sensorInterface = objectServer.add_interface(
         dbusPath, "xyz.openbmc_project.Sensor.Value");
 
-  std::cerr << "sensor type " << sensorTypeName << " name " << name
+    std::cerr << "sensor type " << sensorTypeName << " name " << name
                       << "\n";
 
     if (sensorTypeName == "temperature/")
     {
         sensorInterface->register_property("Unit",
             std::string("xyz.openbmc_project.Sensor.Value.Unit.DegreesC"));
+        sensorInterface->register_property("Scale", -3);
     }
     else if (sensorTypeName == "voltage/")
     {
         sensorInterface->register_property("Unit",
             std::string("xyz.openbmc_project.Sensor.Value.Unit.Volts"));
+        sensorInterface->register_property("Scale", -3);
     }
     else if (sensorTypeName == "current/")
     {
         sensorInterface->register_property("Unit",
             std::string("xyz.openbmc_project.Sensor.Value.Unit.Amperes"));
+        sensorInterface->register_property("Scale", -3);
     }
     else if (sensorTypeName == "power/")
     {
         sensorInterface->register_property("Unit",
             std::string("xyz.openbmc_project.Sensor.Value.Unit.Watts"));
+        sensorInterface->register_property("Scale", -6);
     }
     if (thresholds::hasWarningInterface(thresholds))
     {
