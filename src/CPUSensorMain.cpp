@@ -38,7 +38,7 @@
 #endif
 // clang-format on
 
-static constexpr bool DEBUG = false;
+static constexpr bool DEBUG = true;
 
 boost::container::flat_map<std::string, std::unique_ptr<CPUSensor>> gCpuSensors;
 
@@ -93,6 +93,7 @@ bool createSensors(boost::asio::io_service& io,
                    boost::container::flat_set<CPUConfig>& cpuConfigs,
                    ManagedObjectType& sensorConfigs)
 {
+#if GETCONF
     bool available = false;
     for (const CPUConfig& cpu : cpuConfigs)
     {
@@ -111,7 +112,7 @@ bool createSensors(boost::asio::io_service& io,
     {
         return false;
     }
-
+#endif
     std::vector<fs::path> hwmonNamePaths;
     if (!findFiles(fs::path(R"(/sys/bus/peci/devices)"),
                    R"(peci-\d+/\d+-.+/peci-.+/hwmon/hwmon\d+/name$)",
@@ -183,7 +184,7 @@ bool createSensors(boost::asio::io_service& io,
         const SensorData* sensorData = nullptr;
         const std::string* interfacePath = nullptr;
         const SensorBaseConfiguration* baseConfiguration = nullptr;
-
+#if GETCONF
         for (const std::pair<sdbusplus::message::object_path, SensorData>&
                  sensor : sensorConfigs)
         {
@@ -230,15 +231,19 @@ bool createSensors(boost::asio::io_service& io,
             continue;
         }
 
+        std::cout << "interfacePath: " << interfacePath << "\n";
+
         auto findCpuId = baseConfiguration->second.find("CpuID");
         if (findCpuId == baseConfiguration->second.end())
         {
             std::cerr << "could not determine CPU ID for " << hwmonName << "\n";
             continue;
         }
-        int cpuId =
-            std::visit(VariantToUnsignedIntVisitor(), findCpuId->second);
 
+        int cpuId = std::visit(VariantToUnsignedIntVisitor(), findCpuId->second);
+#else
+        int cpuId;
+#endif
         auto directory = hwmonNamePath.parent_path();
         std::vector<fs::path> inputPaths;
         if (!findFiles(directory, R"(temp\d+_input$)", inputPaths, 0))
@@ -262,7 +267,9 @@ bool createSensors(boost::asio::io_service& io,
             std::string label;
             std::getline(labelFile, label);
             labelFile.close();
-
+#if !GETCONF
+            cpuId = std::stoi(hwmonName.substr(hwmonName.find_last_of("cpu") + 1));
+#endif
             std::string sensorName = label + " CPU" + std::to_string(cpuId);
 
             auto findSensor = gCpuSensors.find(sensorName);
@@ -292,6 +299,7 @@ bool createSensors(boost::asio::io_service& io,
              * set it if configured or else set it to 0
              */
             double dtsOffset = 0;
+#if GETCONF
             if (label == "DTS")
             {
                 auto findThrOffset =
@@ -302,13 +310,15 @@ bool createSensors(boost::asio::io_service& io,
                                            findThrOffset->second);
                 }
             }
-
+#endif
             std::vector<thresholds::Threshold> sensorThresholds;
             std::string labelHead = label.substr(0, label.find(" "));
+#if GETCONF
             parseThresholdsFromConfig(*sensorData, sensorThresholds,
                                       &labelHead);
             if (sensorThresholds.empty())
             {
+#endif
                 if (!parseThresholdsFromAttr(sensorThresholds, inputPathStr,
                                              CPUSensor::sensorScaleFactor,
                                              dtsOffset))
@@ -316,7 +326,9 @@ bool createSensors(boost::asio::io_service& io,
                     std::cerr << "error populating thresholds for "
                               << sensorName << "\n";
                 }
+#if GETCONF
             }
+#endif
             gCpuSensors[sensorName] = std::make_unique<CPUSensor>(
                 inputPathStr, sensorType, objectServer, dbusConnection, io,
                 sensorName, std::move(sensorThresholds), *interfacePath, cpuId,
@@ -394,6 +406,10 @@ void detectCpu(boost::asio::deadline_timer& pingTimer,
     size_t rescanDelaySeconds = 0;
     static bool keepPinging = false;
 
+#if !GETCONF
+    createSensors(io, objectServer, dbusConnection, cpuConfigs,
+                               sensorConfigs);
+#else
     for (CPUConfig& config : cpuConfigs)
     {
         std::string peciDevPath = peciDev + std::to_string(config.bus);
@@ -508,6 +524,7 @@ void detectCpu(boost::asio::deadline_timer& pingTimer,
         detectCpuAsync(pingTimer, creationTimer, io, objectServer,
                        dbusConnection, cpuConfigs, sensorConfigs);
     }
+#endif
 }
 
 void detectCpuAsync(
@@ -667,13 +684,16 @@ int main()
         {
             return; // we're being canceled
         }
-
+#if GETCONF
         if (getCpuConfig(systemBus, cpuConfigs, sensorConfigs, objectServer,
                          inventoryIfaces))
         {
+#endif
             detectCpuAsync(pingTimer, creationTimer, io, objectServer,
                            systemBus, cpuConfigs, sensorConfigs);
+#if GETCONF
         }
+#endif
     });
 
     std::function<void(sdbusplus::message::message&)> eventHandler =
@@ -696,13 +716,16 @@ int main()
                 {
                     return; // we're being canceled
                 }
-
+#if GETCONF
                 if (getCpuConfig(systemBus, cpuConfigs, sensorConfigs,
                                  objectServer, inventoryIfaces))
                 {
+#endif
                     detectCpuAsync(pingTimer, creationTimer, io, objectServer,
                                    systemBus, cpuConfigs, sensorConfigs);
+#if GETCONF
                 }
+#endif
             });
         };
 

@@ -10,6 +10,8 @@
 #include <sdbusplus/asio/object_server.hpp>
 #include <sensor.hpp>
 
+#define GETCONF 0
+
 class CPUSensor : public Sensor
 {
   public:
