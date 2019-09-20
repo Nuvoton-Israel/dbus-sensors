@@ -28,7 +28,7 @@ class CPUSensor : public Sensor
     static constexpr size_t warnAfterErrorCount = 10;
     static constexpr double maxReading = 127;
     static constexpr double minReading = -128;
-    static constexpr double Scale = -3;
+    static constexpr int64_t Scale = -3;
     static constexpr const char* labelTcontrol = "Tcontrol";
 
   private:
