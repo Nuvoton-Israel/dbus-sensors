@@ -1,6 +1,7 @@
 #pragma once
 #include "VariantVisitors.hpp"
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/container/flat_map.hpp>
 #include <filesystem>
 #include <iostream>
@@ -97,6 +98,12 @@ const static constexpr char* path = "/xyz/openbmc_project/state/os";
 const static constexpr char* property = "OperatingSystemState";
 } // namespace post
 
+namespace association
+{
+const static constexpr char* interface =
+    "xyz.openbmc_project.Association.Definitions";
+} // namespace association
+
 template <typename T>
 inline T loadVariant(
     const boost::container::flat_map<std::string, BasicVariantType>& data,
@@ -142,3 +149,84 @@ inline void setReadState(const std::string& str, PowerState& val)
         val = PowerState::always;
     }
 }
+
+void createInventoryAssoc(
+    std::shared_ptr<sdbusplus::asio::connection> conn,
+    std::shared_ptr<sdbusplus::asio::dbus_interface> association,
+    const std::string& path);
+
+struct GetSensorConfiguration
+    : std::enable_shared_from_this<GetSensorConfiguration>
+{
+    GetSensorConfiguration(
+        std::shared_ptr<sdbusplus::asio::connection> connection,
+        std::function<void(ManagedObjectType& resp)>&& callbackFunc) :
+        dbusConnection(connection),
+        callback(std::move(callbackFunc))
+    {
+    }
+    void getConfiguration(const std::vector<std::string>& interfaces)
+    {
+        std::shared_ptr<GetSensorConfiguration> self = shared_from_this();
+        dbusConnection->async_method_call(
+            [self, interfaces](const boost::system::error_code ec,
+                               const GetSubTreeType& ret) {
+                if (ec)
+                {
+                    std::cerr << "Error calling mapper\n";
+                    return;
+                }
+                for (const auto& [path, objDict] : ret)
+                {
+                    if (objDict.empty())
+                    {
+                        return;
+                    }
+                    const std::string& owner = objDict.begin()->first;
+
+                    for (const std::string& interface : objDict.begin()->second)
+                    {
+                        // anything that starts with a requested configuration
+                        // is good
+                        if (std::find_if(
+                                interfaces.begin(), interfaces.end(),
+                                [interface](const std::string& possible) {
+                                    return boost::starts_with(interface,
+                                                              possible);
+                                }) == interfaces.end())
+                        {
+                            continue;
+                        }
+
+                        self->dbusConnection->async_method_call(
+                            [self, path, interface](
+                                const boost::system::error_code ec,
+                                boost::container::flat_map<
+                                    std::string, BasicVariantType>& data) {
+                                if (ec)
+                                {
+                                    std::cerr << "Error getting " << path
+                                              << "\n";
+                                    return;
+                                }
+                                self->respData[path][interface] =
+                                    std::move(data);
+                            },
+                            owner, path, "org.freedesktop.DBus.Properties",
+                            "GetAll", interface);
+                    }
+                }
+            },
+            mapper::busName, mapper::path, mapper::interface, mapper::subtree,
+            "/", 0, interfaces);
+    }
+
+    ~GetSensorConfiguration()
+    {
+        callback(respData);
+    }
+
+    std::shared_ptr<sdbusplus::asio::connection> dbusConnection;
+    std::function<void(ManagedObjectType& resp)> callback;
+    ManagedObjectType respData;
+};

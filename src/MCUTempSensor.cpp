@@ -80,7 +80,7 @@ MCUTempSensor::MCUTempSensor(std::shared_ptr<sdbusplus::asio::connection>& conn,
     }
     association = objectServer.add_interface(
         "/xyz/openbmc_project/sensors/temperature/" + name,
-        "org.openbmc.Associations");
+        association::interface);
 }
 
 MCUTempSensor::~MCUTempSensor()

@@ -66,11 +66,21 @@ PSUCombineEvent::~PSUCombineEvent()
     objServer.remove_interface(eventInterface);
 }
 
-static boost::container::flat_map<std::string, std::string> logID = {
-    {"PredictiveFailure", "OpenBMC.0.1.PowerSupplyFailurePredicted"},
-    {"Failure", "OpenBMC.0.1.PowerSupplyFailed"},
-    {"ACLost", "OpenBMC.0.1.PowerSupplyACLost"},
-    {"FanFault", "OpenBMC.0.1.PowerSupplyFanFailed"}};
+static boost::container::flat_map<std::string,
+                                  std::pair<std::string, std::string>>
+    logID = {
+        {"PredictiveFailure",
+         {"OpenBMC.0.1.PowerSupplyFailurePredicted",
+          "OpenBMC.0.1.PowerSupplyPredictedFailureRecovered"}},
+        {"Failure",
+         {"OpenBMC.0.1.PowerSupplyFailed", "OpenBMC.0.1.PowerSupplyRecovered"}},
+        {"ACLost",
+         {"OpenBMC.0.1.PowerSupplyPowerLost",
+          "OpenBMC.0.1.PowerSupplyPowerRestored"}},
+        {"FanFault",
+         {"OpenBMC.0.1.PowerSupplyFanFailed",
+          "OpenBMC.0.1.PowerSupplyFanRecovered"}},
+        {"ConfigureError", {"OpenBMC.0.1.PowerSupplyConfigurationError", ""}}};
 
 PSUSubEvent::PSUSubEvent(
     std::shared_ptr<sdbusplus::asio::dbus_interface> eventInterface,
@@ -87,17 +97,24 @@ PSUSubEvent::PSUSubEvent(
     auto found = logID.find(eventName);
     if (found == logID.end())
     {
-        messageID.clear();
+        assertMessage.clear();
+        deassertMessage.clear();
     }
     else
     {
-        messageID = found->second;
+        assertMessage = found->second.first;
+        deassertMessage = found->second.second;
     }
 
     auto fanPos = path.find("fan");
     if (fanPos != std::string::npos)
     {
         fanName = path.substr(fanPos);
+        auto fanNamePos = fanName.find("_");
+        if (fanNamePos != std::string::npos)
+        {
+            fanName = fanName.substr(0, fanNamePos);
+        }
     }
     setupRead();
 }
@@ -185,7 +202,7 @@ void PSUSubEvent::updateValue(const int& newValue)
         {
             return;
         }
-        (*asserts).erase(found);
+        (*asserts).erase(path);
 
         if (!(*asserts).empty())
         {
@@ -195,11 +212,33 @@ void PSUSubEvent::updateValue(const int& newValue)
         {
             *assertState = false;
             auto foundCombine = (*combineEvent).find(eventName);
-            if (foundCombine != (*combineEvent).end())
+            if (foundCombine == (*combineEvent).end())
             {
                 return;
             }
             (*combineEvent).erase(eventName);
+            if (!deassertMessage.empty())
+            {
+                // Fan Failed has two args
+                std::string sendMessage = eventName + " deassert";
+                if (deassertMessage == "OpenBMC.0.1.PowerSupplyFanRecovered")
+                {
+                    sd_journal_send(
+                        "MESSAGE=%s", sendMessage.c_str(), "PRIORITY=%i",
+                        LOG_ERR, "REDFISH_MESSAGE_ID=%s",
+                        deassertMessage.c_str(), "REDFISH_MESSAGE_ARGS=%s,%s",
+                        psuName.c_str(), fanName.c_str(), NULL);
+                }
+                else
+                {
+                    sd_journal_send(
+                        "MESSAGE=%s", sendMessage.c_str(), "PRIORITY=%i",
+                        LOG_ERR, "REDFISH_MESSAGE_ID=%s",
+                        deassertMessage.c_str(), "REDFISH_MESSAGE_ARGS=%s",
+                        psuName.c_str(), NULL);
+                }
+            }
+
             if ((*combineEvent).empty())
             {
                 eventInterface->set_property("functional", true);
@@ -212,23 +251,23 @@ void PSUSubEvent::updateValue(const int& newValue)
         if (*assertState == false)
         {
             *assertState = true;
-            if (!messageID.empty())
+            if (!assertMessage.empty())
             {
                 // Fan Failed has two args
                 std::string sendMessage = eventName + " assert";
-                if (messageID == "OpenBMC.0.1.PowerSupplyFanFailed")
+                if (assertMessage == "OpenBMC.0.1.PowerSupplyFanFailed")
                 {
-                    sd_journal_send("MESSAGE=%s", sendMessage.c_str(),
-                                    "PRIORITY=%i", LOG_ERR,
-                                    "REDFISH_MESSAGE_ID=%s", messageID.c_str(),
-                                    "REDFISH_MESSAGE_ARGS=%s,%s",
-                                    psuName.c_str(), fanName.c_str(), NULL);
+                    sd_journal_send(
+                        "MESSAGE=%s", sendMessage.c_str(), "PRIORITY=%i",
+                        LOG_ERR, "REDFISH_MESSAGE_ID=%s", assertMessage.c_str(),
+                        "REDFISH_MESSAGE_ARGS=%s,%s", psuName.c_str(),
+                        fanName.c_str(), NULL);
                 }
                 else
                 {
                     sd_journal_send(
                         "MESSAGE=%s", sendMessage.c_str(), "PRIORITY=%i",
-                        LOG_ERR, "REDFISH_MESSAGE_ID=%s", messageID.c_str(),
+                        LOG_ERR, "REDFISH_MESSAGE_ID=%s", assertMessage.c_str(),
                         "REDFISH_MESSAGE_ARGS=%s", psuName.c_str(), NULL);
                 }
             }

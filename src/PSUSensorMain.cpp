@@ -149,6 +149,7 @@ void createSensors(boost::asio::io_service& io,
 
     // TODO may need only modify the ones that need to be changed.
     sensors.clear();
+    combineEvents.clear();
     for (const char* type : sensorTypes)
     {
         if (!getSensorConfiguration(type, dbusConnection, sensorConfigs,
@@ -334,33 +335,19 @@ void createSensors(boost::asio::io_service& io,
             std::string sensorNameSubStr =
                 sensorNameStr.substr(0, sensorNameStr.find("_") - 1);
 
-            std::string labelPathStr =
-                boost::replace_all_copy(sensorNameStr, "input", "label");
-            std::vector<fs::path> labelPaths;
-            if (!findFiles(directory, labelPathStr, labelPaths, 0))
+            auto labelPath =
+                boost::replace_all_copy(sensorPathStr, "input", "label");
+            std::ifstream labelFile(labelPath);
+            if (!labelFile.good())
             {
-                std::cerr << "No PSU non-label sensor in PSU\n";
-                continue;
-            }
-
-            if (labelPaths.empty())
-            {
+                std::cerr << "Failure reading " << sensorPath << "\n";
                 labelHead = sensorNameStr.substr(0, sensorNameStr.find("_"));
             }
             else
             {
-                auto labelPath =
-                    boost::replace_all_copy(sensorPathStr, "input", "label");
-                std::ifstream labelFile(labelPath);
-                if (!labelFile.good())
-                {
-                    std::cerr << "Failure reading " << sensorPath << "\n";
-                    continue;
-                }
                 std::string label;
                 std::getline(labelFile, label);
                 labelFile.close();
-
                 auto findSensor = sensors.find(label);
                 if (findSensor != sensors.end())
                 {
@@ -447,6 +434,7 @@ void createSensors(boost::asio::io_service& io,
         }
 
         // OperationalStatus event
+        combineEvents[*psuName + "OperationalStatus"] = nullptr;
         combineEvents[*psuName + "OperationalStatus"] =
             std::make_unique<PSUCombineEvent>(
                 objectServer, io, *psuName, eventPathList, "OperationalStatus");
@@ -491,8 +479,9 @@ void propertyInitialize(void)
     eventMatch = {
         {"PredictiveFailure", {"power1_alarm"}},
         {"Failure", {"in2_alarm"}},
-        {"ACLost", {"in1_alarm", "in1_lcrit_alarm"}},
-        {"FanFault", {"fan1_alarm", "fan2_alarm", "fan1_fault", "fan2_fault"}}};
+        {"ACLost", {"in1_beep"}},
+        {"FanFault", {"fan1_alarm", "fan2_alarm", "fan1_fault", "fan2_fault"}},
+        {"ConfigureError", {"in1_fault"}}};
 }
 
 int main()
