@@ -56,14 +56,12 @@ struct Sensor
         setInitialProperties(std::shared_ptr<sdbusplus::asio::connection>& conn)
     {
         createAssociation(association, configurationPath);
-
         sensorInterface->register_property("MaxValue", maxValue);
         sensorInterface->register_property("MinValue", minValue);
         sensorInterface->register_property(
             "Value", value, [&](const double& newValue, double& oldValue) {
                 return setSensorValue(newValue, oldValue);
             });
-
         for (auto& threshold : thresholds)
         {
             std::shared_ptr<sdbusplus::asio::dbus_interface> iface;
@@ -144,7 +142,10 @@ struct Sensor
         {
             // Indicate that it is internal set call
             internalSet = true;
-            sensorInterface->set_property("Value", newValue);
+            if (!(sensorInterface->set_property("Value", newValue)))
+            {
+                std::cerr << "error setting property to " << newValue << "\n";
+            }
             internalSet = false;
             double diff = std::abs(value - newValue);
             if (std::isnan(diff) || diff > hysteresis)

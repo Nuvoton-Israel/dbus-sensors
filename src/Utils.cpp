@@ -52,8 +52,12 @@ bool getSensorConfiguration(
                 dbusConnection->call(getManagedObjects);
             reply.read(managedObj);
         }
-        catch (const sdbusplus::exception::exception&)
+        catch (const sdbusplus::exception::exception& e)
         {
+            std::cerr << "While calling GetManagedObjects on service:"
+                      << entityManagerName << " exception name:" << e.name()
+                      << "and description:" << e.description()
+                      << " was thrown\n";
             err = true;
         }
 
@@ -65,8 +69,6 @@ bool getSensorConfiguration(
     }
     for (const auto& pathPair : managedObj)
     {
-        std::vector<boost::container::flat_map<std::string, BasicVariantType>>
-            sensorData;
         bool correctType = false;
         for (const auto& entry : pathPair.second)
         {
